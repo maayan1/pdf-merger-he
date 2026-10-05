@@ -2,6 +2,8 @@
 
 A small, single-purpose tool for merging multiple PDF files into one — runs entirely in the browser, with a **true zero-network-request guarantee**.
 
+🔗 **[Try it live](https://maayan1.github.io/pdf-merger-he/)** — hosted on GitHub Pages. Note: Pages itself is a web server that serves the static files; the "zero network requests" guarantee below is about the app's *own* behavior once loaded — it never sends your PDFs anywhere. For the strongest offline guarantee, clone the repo and open `index.html` directly from disk.
+
 ## Why
 
 I needed to merge personal PDFs without uploading them anywhere — not even to a CDN. Existing tools required a server upload, so I built my own with one hard requirement: **zero network requests, including for loading libraries**. I verified this empirically by disconnecting the internet entirely and confirming the merge still works.
