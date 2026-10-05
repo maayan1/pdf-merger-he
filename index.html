@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>איחוד קבצי PDF</title>
+<style>
+:root{--bg:#f4f6f8;--card:#fff;--text:#172033;--muted:#667085;--line:#e4e7ec;--primary:#2457d6;--primary2:#1947bd;--danger:#b42318;--ok:#067647}
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,"Segoe UI",sans-serif;background:var(--bg);color:var(--text)}
+.wrap{max-width:760px;margin:48px auto;padding:0 18px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:32px;box-shadow:0 8px 30px rgba(16,24,40,.07)}
+h1{margin:0 0 8px;font-size:30px}
+.sub{margin:0 0 26px;color:var(--muted);line-height:1.6}
+.actions{display:flex;gap:12px;flex-wrap:wrap}
+button,.pick{border:0;border-radius:10px;padding:12px 18px;font-size:16px;font-weight:700;cursor:pointer}
+.pick,.primary{background:var(--primary);color:white}
+.pick:hover,.primary:hover{background:var(--primary2)}
+.secondary{background:#eef2f6;color:#344054}
+button:disabled{opacity:.45;cursor:not-allowed}
+input[type=file]{display:none}
+.list{margin-top:22px;border-top:1px solid var(--line)}
+.item{display:flex;align-items:center;gap:10px;padding:13px 0;border-bottom:1px solid var(--line)}
+.num{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:#eef2ff;font-weight:700}
+.name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.size{font-size:13px;color:var(--muted)}
+.icon{padding:7px 10px;background:#f2f4f7;color:#344054}
+.remove{color:var(--danger)}
+.status{display:none;margin-top:18px;padding:12px 14px;border-radius:10px;line-height:1.5}
+.status.show{display:block}
+.status.info{background:#eff4ff;color:#3538cd}
+.status.ok{background:#ecfdf3;color:var(--ok)}
+.status.err{background:#fef3f2;color:var(--danger)}
+.privacy{margin-top:24px;padding:14px;border-radius:12px;background:#f8fafc;color:#475467;font-size:14px;line-height:1.6}
+.footer{text-align:center;color:#98a2b3;font-size:12px;margin-top:14px}
+@media(max-width:600px){.wrap{margin:20px auto}.card{padding:22px}.size{display:none}h1{font-size:26px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <main class="card">
+    <h1>איחוד קבצי PDF</h1>
+    <p class="sub">בחרו שני קבצי PDF או יותר, סדרו אותם לפי הצורך ולחצו על "איחוד והורדה".</p>
+
+    <div class="actions">
+      <label class="pick" for="files">בחירת קבצי PDF</label>
+      <input id="files" type="file" accept="application/pdf,.pdf" multiple>
+      <button id="merge" class="primary" disabled>איחוד והורדה</button>
+      <button id="clear" class="secondary" disabled>ניקוי הרשימה</button>
+    </div>
+
+    <div id="list" class="list"></div>
+    <div id="status" class="status" role="status" aria-live="polite"></div>
+
+    <div class="privacy">
+      🔒 <strong>הקבצים נשארים במחשב.</strong>
+      הכלי עובד מקומית בתוך הדפדפן ואינו מעלה את קבצי ה‑PDF לשרת או לאינטרנט.
+    </div>
+  </main>
+  <div class="footer">כלי מקומי לאיחוד PDF</div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+<script>
+(() => {
+  const input = document.getElementById('files');
+  const list = document.getElementById('list');
+  const mergeBtn = document.getElementById('merge');
+  const clearBtn = document.getElementById('clear');
+  const status = document.getElementById('status');
+  let files = [];
+
+  function setStatus(text, type='info') {
+    status.textContent = text;
+    status.className = 'status show ' + type;
+  }
+  function clearStatus() {
+    status.textContent = '';
+    status.className = 'status';
+  }
+  function humanSize(n) {
+    if (n < 1024) return n + ' B';
+    if (n < 1024*1024) return (n/1024).toFixed(1) + ' KB';
+    return (n/(1024*1024)).toFixed(1) + ' MB';
+  }
+  function render() {
+    list.innerHTML = '';
+    files.forEach((file, i) => {
+      const row = document.createElement('div');
+      row.className = 'item';
+
+      const num = document.createElement('div');
+      num.className = 'num';
+      num.textContent = i + 1;
+
+      const name = document.createElement('div');
+      name.className = 'name';
+      name.textContent = file.name;
+      name.title = file.name;
+
+      const size = document.createElement('div');
+      size.className = 'size';
+      size.textContent = humanSize(file.size);
+
+      const up = document.createElement('button');
+      up.className = 'icon';
+      up.textContent = '↑';
+      up.title = 'הזזה למעלה';
+      up.disabled = i === 0;
+      up.onclick = () => { [files[i-1], files[i]] = [files[i], files[i-1]]; render(); };
+
+      const down = document.createElement('button');
+      down.className = 'icon';
+      down.textContent = '↓';
+      down.title = 'הזזה למטה';
+      down.disabled = i === files.length - 1;
+      down.onclick = () => { [files[i+1], files[i]] = [files[i], files[i+1]]; render(); };
+
+      const remove = document.createElement('button');
+      remove.className = 'icon remove';
+      remove.textContent = '✕';
+      remove.title = 'הסרה';
+      remove.onclick = () => { files.splice(i,1); render(); };
+
+      row.append(num, name, size, up, down, remove);
+      list.appendChild(row);
+    });
+
+    mergeBtn.disabled = files.length < 2;
+    clearBtn.disabled = files.length === 0;
+  }
+
+  input.addEventListener('change', () => {
+    clearStatus();
+    const selected = [...input.files].filter(f =>
+      f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf')
+    );
+    files.push(...selected);
+    input.value = '';
+    render();
+  });
+
+  clearBtn.addEventListener('click', () => {
+    files = [];
+    render();
+    clearStatus();
+  });
+
+  mergeBtn.addEventListener('click', async () => {
+    if (files.length < 2) return;
+    mergeBtn.disabled = true;
+    clearBtn.disabled = true;
+    setStatus('מאחד את הקבצים… נא להמתין.', 'info');
+
+    try {
+      const out = await PDFLib.PDFDocument.create();
+
+      for (const file of files) {
+        try {
+          const bytes = new Uint8Array(await file.arrayBuffer());
+          const src = await PDFLib.PDFDocument.load(bytes, {
+            ignoreEncryption: false,
+            updateMetadata: false
+          });
+          const pages = await out.copyPages(src, src.getPageIndices());
+          pages.forEach(p => out.addPage(p));
+        } catch (e) {
+          throw new Error('לא ניתן לעבד את הקובץ "' + file.name + '". ייתכן שה‑PDF מוגן או בנוי בצורה לא תקינה. נסו לפתוח אותו, לבחור הדפסה → Microsoft Print to PDF, לשמור עותק חדש ולנסות שוב.');
+        }
+      }
+
+      const bytes = await out.save();
+      const blob = new Blob([bytes], {type:'application/pdf'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'PDF-מאוחד.pdf';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 30000);
+      setStatus('הקובץ אוחד בהצלחה וההורדה התחילה.', 'ok');
+    } catch (e) {
+      console.error(e);
+      setStatus(e.message || 'אירעה שגיאה באיחוד הקבצים.', 'err');
+    } finally {
+      mergeBtn.disabled = files.length < 2;
+      clearBtn.disabled = files.length === 0;
+    }
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
